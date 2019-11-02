@@ -9,7 +9,7 @@ def get_user_info(email):
 
     user = User.find_with_email(email)
     if not user:
-        return abort(404)
+        return abort(404, "user not found")
 
     return jsonify(user.make_json())
 
@@ -28,6 +28,11 @@ def register_user():
                          last_name=last_name, phone_number=phone_number,
                          profile_picture=profile_picture)
 
+    try:
+        user.send_text(f"Hey {user.first_name.capitalize()}, thank you for registering on InstaPool!")
+    except Exception as e:
+        print(e)
+
     return jsonify(user.make_json())
 
 
@@ -36,7 +41,7 @@ def update_user_location(email):
 
     user = User.find_with_email(email)
     if not user:
-        return abort(404)
+        return abort(404, "user not found")
 
     longitude = request.json['location']['longitude']
     latitude = request.json['location']['latitude']
@@ -51,7 +56,7 @@ def request_new_ride(email):
     user = User.find_with_email(email)
     data = request.json
     if not user:
-        return abort(404)
+        return abort(404, "user not found")
 
     time = data.get('time')
     before_flex = data.get('before_flex')
@@ -76,7 +81,7 @@ def get_ride_requests(email):
 
     user = User.find_with_email(email)
     if not user:
-        return abort(404)
+        return abort(404, "user not found")
 
     requests = RideRequest.find_for_user(user)
     return jsonify(list(map(lambda x: x.make_json(), requests)))
@@ -87,12 +92,12 @@ def post_new_ride(email):
 
     user = User.find_with_email(email)
     if not user:
-        return abort(404)
+        return abort(404, "user not found")
 
     data = request.data
 
-    start = data['start_time']
-    end = data['end_time']
+    start = data['start']
+    end = data['end']
 
     location_lon = data['location']['longitude']
     location_lat = data['location']['latitude']
@@ -113,7 +118,7 @@ def get_user_rides(email):
 
     user = User.find_with_email(email)
     if not user:
-        return abort(404)
+        return abort(404, "user not found")
 
     rides = Ride.find_for_user(user)
     return jsonify(list(map(lambda x: x.make_json(), rides)))
@@ -130,7 +135,7 @@ def start_matching_ride(email, ride_id):
 
     driver = User.find_with_email(email)
     if not driver:
-        return abort(404)
+        return abort(404, "driver not found")
 
     ride = Ride.objects.get(id=ride_id)
     matched_requests = RideRequest.find_within_time(
@@ -157,10 +162,32 @@ def get_matching_rides(email, ride_id):
 
     user = User.find_with_email(email)
     if not user:
-        return abort(404)
+        return abort(404, "user not found")
 
     ride = Ride.objects.get(id=ride_id)
     matches = RideMatching.find_with_ride(ride)
+    return jsonify(list(map(lambda x: x.make_json(), matches)))
+
+
+@mod.route('/user/<email>/ride/rider/matches', methods=['GET'])
+def get_rider_match_offers(email):
+
+    user = User.find_with_email(email)
+    if not user:
+        return abort(404, "user not found")
+
+    matches = RideMatching.objects(rider=user)
+    return jsonify(list(map(lambda x: x.make_json(), matches)))
+
+
+@mod.route('/user/<email>/ride/driver/matches', methods=['GET'])
+def get_driver_match_offers(email):
+
+    user = User.find_with_email(email)
+    if not user:
+        return abort(404, "user not found")
+
+    matches = RideMatching.objects(driver=user)
     return jsonify(list(map(lambda x: x.make_json(), matches)))
 
 
@@ -169,7 +196,7 @@ def accept_ride_match(email, ride_id):
 
     user = User.find_with_email(email)
     if not user:
-        return abort(404)
+        return abort(404, "user not found")
 
     ride = Ride.objects.get(id=ride_id)
     ride_match = RideMatching.objects.get(ride=ride, rider=user)
@@ -185,7 +212,7 @@ def reject_ride_match(email, ride_id):
 
     user = User.find_with_email(email)
     if not user:
-        return abort(404)
+        return abort(404, "user not found")
 
     ride = Ride.objects.get(id=ride_id)
     ride_match = RideMatching.objects.get(ride=ride, rider=user)
@@ -194,4 +221,5 @@ def reject_ride_match(email, ride_id):
 
     ride_match.reject()
     return jsonify(ride_match.make_json())
+
 

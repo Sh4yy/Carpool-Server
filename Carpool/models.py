@@ -1,12 +1,13 @@
 from mongoengine import *
 from enum import Enum
 from secrets import token_hex
+from .utils import twilio_client, config
 import geopy
 
 
 class User(Document):
 
-    id = StringField(unique=True, primary_key=True, default=lambda: token_hex(5))
+    uid = StringField(primary_key=True, default=lambda: token_hex(5))
     email = StringField(required=True)
     first_name = StringField(required=True)
     last_name = StringField(required=True)
@@ -29,31 +30,41 @@ class User(Document):
 
     @classmethod
     def find_with_email(cls, email):
-        return cls.objects.get(email=email.lower())
+        try:
+            user = cls.objects.get(email=email.lower())
+        except DoesNotExist as e:
+            return None
+        return user
 
     def update_location(self, lon, lat):
         self.location = [lon, lat]
         self.save()
 
     def send_text(self, text_message):
-        pass
+
+        (twilio_client
+         .messages
+         .create(
+            body=text_message,
+            to=f"+1{self.phone_number}",
+            from_=config['twilio']['from_number']
+        ))
 
     def send_push(self, push_data):
         pass
 
     def make_json(self):
         json = {
-            "id": self.id,
+            "uid": self.uid,
             "email": self.email,
             "first_name": self.first_name,
             "last_name": self.last_name,
             "profile_picture": self.profile_picture,
             "phone_number": self.phone_number,
-            "location": {
-            }
         }
 
         if self.location:
+            json['location'] = {}
             json['location']['longitude'] = self.location[0]
             json['location']['latitude'] = self.location[1]
 
@@ -62,7 +73,7 @@ class User(Document):
 
 class RideRequest(Document):
 
-    id = StringField(unique=True, primary_key=True, default=lambda: token_hex(5))
+    uid = StringField(primary_key=True, default=lambda: token_hex(5))
     by_user = ReferenceField(User)
     at_time = FloatField(required=True)
     before_flex = IntField(required=True)
@@ -112,7 +123,7 @@ class RideRequest(Document):
 
     def make_json(self):
         json = {
-            "id": self.id,
+            "uid": self.uid,
             "user": self.by_user.make_json(),
             "start": self.start,
             "end": self.end,
@@ -133,7 +144,7 @@ class RideRequest(Document):
 
 class Ride(Document):
 
-    id = StringField(unique=True, primary_key=True, default=lambda: token_hex(5))
+    uid = StringField(primary_key=True, default=lambda: token_hex(5))
     by_user = ReferenceField(User)
     location = PointField(auto_index=True)
     destination = PointField(auto_index=False)
@@ -159,7 +170,7 @@ class Ride(Document):
 
     def make_json(self):
         json = {
-            "id": self.id,
+            "uid": self.uid,
             "user": self.by_user.make_json(),
             "start": self.start,
             "end": self.end,
@@ -176,39 +187,6 @@ class Ride(Document):
         return json
 
 
-class EnumField(object):
-    """
-    A class to register Enum type (from the package enum34) into mongo
-    :param choices: must be of :class:`enum.Enum`: type
-        and will be used as possible choices
-    """
-
-    def __init__(self, enum, *args, **kwargs):
-        self.enum = enum
-        kwargs['choices'] = [choice for choice in enum]
-        super(EnumField, self).__init__(*args, **kwargs)
-
-    def __get_value(self, enum):
-        return enum.value if hasattr(enum, 'value') else enum
-
-    def to_python(self, value):
-        return self.enum(super(EnumField, self).to_python(value))
-
-    def to_mongo(self, value):
-        return self.__get_value(value)
-
-    def prepare_query_value(self, op, value):
-        return super(EnumField, self).prepare_query_value(
-                op, self.__get_value(value))
-
-    def validate(self, value):
-        return super(EnumField, self).validate(self.__get_value(value))
-
-    def _validate(self, value, **kwargs):
-        return super(EnumField, self)._validate(
-                self.enum(self.__get_value(value)), **kwargs)
-
-
 class RideMatchingStatus(Enum):
 
     pending = "pending"
@@ -218,18 +196,18 @@ class RideMatchingStatus(Enum):
 
 class RideMatching(Document):
 
-    id = StringField(unique=True, primary_key=True, default=lambda: token_hex(5))
+    uid = StringField(primary_key=True, default=lambda: token_hex(5))
     driver = ReferenceField(User)
     rider = ReferenceField(User)
     ride = ReferenceField(Ride)
     request = ReferenceField(RideRequest)
     cost = FloatField()
-    status = EnumField(RideMatchingStatus)
+    status = StringField()
 
     @classmethod
     def create(cls, driver, rider, ride, request, cost):
         match = cls()
-        match.status = RideMatchingStatus.pending
+        match.status = RideMatchingStatus.pending.value
         match.rider = rider
         match.ride = ride
         match.request = request
@@ -255,16 +233,16 @@ class RideMatching(Document):
         return cls.objects(request=request)
 
     def accept(self):
-        self.status = RideMatchingStatus.accepted
+        self.status = RideMatchingStatus.accepted.value
         self.save()
 
     def reject(self):
-        self.status = RideMatchingStatus.rejected
+        self.status = RideMatchingStatus.rejected.value
         self.save()
 
     def make_json(self):
         json = {
-            "id": self.id,
+            "uid": self.uid,
             "rider": self.rider.make_json(),
             "driver": self.driver.make_json(),
             "ride": self.ride.make_json(),
