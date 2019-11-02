@@ -1,0 +1,15 @@
+{
+    "database": {
+        "mongo": {
+            "url": "mongodb+srv://admin:HackDuke00@instapool-ggzgl.gcp.mongodb.net/test?retryWrites=true&w=majority"
+        },
+        "postgres": {
+            "url": "158.69.1.114",
+            "port": 5432
+        },
+        "redis": {
+            "url": "158.69.1.114",
+            "port": 6379
+        }
+    }
+}
