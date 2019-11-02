@@ -128,9 +128,28 @@ def start_matching_ride(email, ride_id):
     # notify users
     # return matches
 
+    driver = User.find_with_email(email)
+    if not driver:
+        return abort(404)
+
     ride = Ride.objects.get(id=ride_id)
+    matched_requests = RideRequest.find_within_time(
+        lon=ride.location[0], lat=ride.location[1],
+        radius=10 * 1000, start=ride.start, end=ride.end)
 
+    for req in matched_requests:
+        match = RideMatching.create(
+            driver=ride.by_user, rider=req.by_user,
+            ride=ride, request=req, cost=req.calculate_cost())
 
+        # todo notify match
+        req.by_user.send_text(
+            f"""{req.by_user.first_name}, we have matched your ride with {driver.first_name},
+                please confirm your pool"""
+        )
+
+    matches = RideMatching.find_with_ride(ride)
+    return jsonify(list(map(lambda x: x.make_json(), matches)))
 
 
 @mod.route('/user/<email>/ride/<ride_id>/match', methods=['GET'])

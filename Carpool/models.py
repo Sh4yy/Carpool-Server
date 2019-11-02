@@ -1,6 +1,7 @@
 from mongoengine import *
 from enum import Enum
 from secrets import token_hex
+import geopy
 
 
 class User(Document):
@@ -99,6 +100,15 @@ class RideRequest(Document):
         """ radius is in meters """
         return cls.objects(location__near=[lon, lat], location__max_distance=radius,
                            start__qe=start, end__lt=end)
+
+    def calculate_cost(self):
+        # todo process this
+
+        dist = geopy.distance.vincenty(
+            (self.location[0], self.location[1]),
+            (self.destination[0], self.destination[1])
+        ).km
+        return 0.4 * dist
 
     def make_json(self):
         json = {
