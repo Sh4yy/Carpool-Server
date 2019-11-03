@@ -297,10 +297,12 @@ def get_coordinate():
 def find_business_by_name(business_name):
 
     location = request.json.get("location")
-
-    business = find_business({"radius": 1500,
+    business = find_business({"radius": 10000,
                               "name": business_name,
                               "location": f"{location['lat']},{location['long']}"})
 
+    if not business:
+        return abort(404, "No business found")
     return jsonify({"location": business["geometry"]["location"],
-                    "name": business["name"]})
+                    "name": business["name"],
+                    "vicinity": business["vicinity"]})
