@@ -1,6 +1,9 @@
 from flask import Blueprint, jsonify, abort, request
 from .models import *
 from .utils import find_location
+import json
+from pprint import pprint
+
 
 mod = Blueprint("routes", __name__)
 
@@ -56,6 +59,7 @@ def request_new_ride(email):
 
     user = User.find_with_email(email)
     data = request.json
+
     if not user:
         return abort(404, "user not found")
 
@@ -96,6 +100,9 @@ def post_new_ride(email):
         return abort(404, "user not found")
 
     data = request.data
+    data = json.loads(data.decode())
+
+    print(data)
 
     start = data['start']
     end = data['end']
@@ -135,13 +142,17 @@ def start_matching_ride(email, ride_id):
     # return matches
 
     driver = User.find_with_email(email)
+    print("here 1")
     if not driver:
         return abort(404, "driver not found")
+    print("here 2")
 
-    ride = Ride.objects.get(id=ride_id)
+    ride = Ride.objects.get(uid=ride_id)
     matched_requests = RideRequest.find_within_time(
-        lon=ride.location[0], lat=ride.location[1],
-        radius=10 * 1000, start=ride.start, end=ride.end)
+        lon=ride.location['coordinates'][0], lat=ride.location['coordinates'][1],
+        radius=50 * 1000, start=ride.start, end=ride.end)
+
+    print("matched", matched_requests)
 
     for req in matched_requests:
         match = RideMatching.create(
@@ -165,7 +176,7 @@ def get_matching_rides(email, ride_id):
     if not user:
         return abort(404, "user not found")
 
-    ride = Ride.objects.get(id=ride_id)
+    ride = Ride.objects.get(uid=ride_id)
     matches = RideMatching.find_with_ride(ride)
     return jsonify(list(map(lambda x: x.make_json(), matches)))
 
@@ -199,7 +210,7 @@ def accept_ride_match(email, ride_id):
     if not user:
         return abort(404, "user not found")
 
-    ride = Ride.objects.get(id=ride_id)
+    ride = Ride.objects.get(uid=ride_id)
     ride_match = RideMatching.objects.get(ride=ride, rider=user)
     if not ride_match:
         return abort(404)
@@ -215,13 +226,50 @@ def reject_ride_match(email, ride_id):
     if not user:
         return abort(404, "user not found")
 
-    ride = Ride.objects.get(id=ride_id)
+    ride = Ride.objects.get(uid=ride_id)
     ride_match = RideMatching.objects.get(ride=ride, rider=user)
     if not ride_match:
         return abort(404)
 
     ride_match.reject()
+    ride_match.delete()
     return jsonify(ride_match.make_json())
+
+
+@mod.route('/user/<email>/feed', methods=['GET'])
+def get_user_feed(email):
+
+    user = User.find_with_email(email)
+
+    user_driving_rides = Ride.find_for_user(user)
+    user_riding_rides = []
+
+    matches = RideMatching.find_with_rider(user, status=RideMatchingStatus.accepted)
+    for match in matches:
+        if match.ride not in user_riding_rides:
+            user_riding_rides.append(match.ride)
+
+    ride_set = set(user_driving_rides).intersection(set(user_riding_rides))
+    result = []
+
+    for ride in ride_set:
+
+        if ride in user_driving_rides:
+            pickup = find_location({"latlng": f"{ride.location['coordinates'][0]}, {ride.location['coordinates'][1]}"})['formatted_address']
+            dest = find_location({"latlng": f"{ride.destination['coordinates'][0]}, {ride.destination['coordinates'][1]}"})['formatted_address']
+        else:
+            match = RideMatching.objects.get(ride=ride, rider=user, status=RideMatchingStatus.accepted.value)
+            pickup = find_location({"latlng": f"{match.request.location['coordinates'][0]}, {match.request.location['coordinates'][1]}"})['formatted_address']
+            dest = find_location({"latlng": f"{match.request.destination['coordinates'][0]}, {match.request.destination['coordinates'][1]}"})['formatted_address']
+
+        temp = {'ride': ride.make_json(),
+                'pickup': pickup,
+                'destination': dest,
+                'matches': list(map(lambda x: x.make_json(), RideMatching.find_with_ride(ride, status=RideMatchingStatus.accepted)))}
+        result.append(temp)
+
+    pprint(result)
+    return jsonify(result)
 
 
 @mod.route('/geo/address', methods=['GET'])

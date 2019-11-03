@@ -2,7 +2,7 @@ from mongoengine import *
 from enum import Enum
 from secrets import token_hex
 from .utils import twilio_client, config
-import geopy
+from geopy import distance
 
 
 class User(Document):
@@ -41,7 +41,7 @@ class User(Document):
         self.save()
 
     def send_text(self, text_message):
-
+        return
         (twilio_client
          .messages
          .create(
@@ -63,10 +63,16 @@ class User(Document):
             "phone_number": self.phone_number,
         }
 
-        if self.location:
-            json['location'] = {}
-            json['location']['longitude'] = self.location[0]
-            json['location']['latitude'] = self.location[1]
+        if type(self.location) is dict:
+            json['location'] = {
+                "longitude": self.location['coordinates'][0],
+                "latitude": self.location['coordinates'][1]
+            }
+        elif self.location:
+            json['location'] = {
+                "longitude": self.location[0],
+                "latitude": self.location[1]
+            }
 
         return json
 
@@ -95,8 +101,8 @@ class RideRequest(Document):
         req.at_time = time
         req.before_flex = before_flex
         req.after_flex = after_flex
-        req.start = time - before_flex
-        req.end = time + after_flex
+        req.start = time - before_flex * 60
+        req.end = time + after_flex * 60
         req.save()
         return req
 
@@ -112,15 +118,15 @@ class RideRequest(Document):
     @classmethod
     def find_within_time(cls, lon, lat, radius, start, end):
         """ radius is in meters """
-        return cls.objects(location__near=[lon, lat], location__max_distance=radius,
-                           start__qe=start, end__lt=end)
+        return cls.objects(location__near=[lon, lat], location__max_distance=radius)
+                           # start__ge=start, end__lt=end)
 
     def calculate_cost(self):
         # todo process this
 
-        dist = geopy.distance.vincenty(
-            (self.location[0], self.location[1]),
-            (self.destination[0], self.destination[1])
+        dist = distance.vincenty(
+            (self.location['coordinates'][0], self.location['coordinates'][1]),
+            (self.destination['coordinates'][0], self.destination['coordinates'][1])
         ).km
         return 0.4 * dist
 
@@ -130,17 +136,29 @@ class RideRequest(Document):
             "user": self.by_user.make_json(),
             "start": self.start,
             "end": self.end,
-            "location": {
-                "longitude": self.location[0],
-                "latitude": self.location[1]
-            },
-            "destination": {
-                "longitude": self.destination[0],
-                "latitude": self.destination[1]
-            },
+            "time": self.at_time,
             "before_flex": self.before_flex,
             "after_flex": self.after_flex
         }
+
+        if type(self.location) is dict:
+            json['location'] = {
+                "longitude": self.location['coordinates'][0],
+                "latitude": self.location['coordinates'][1]
+            }
+            json['destination'] = {
+                "longitude": self.destination['coordinates'][0],
+                "latitude": self.destination['coordinates'][1]
+            }
+        else:
+            json['location'] = {
+                "longitude": self.location[0],
+                "latitude": self.location[1]
+            }
+            json['destination'] = {
+                "longitude": self.destination[0],
+                "latitude": self.destination[1]
+            }
 
         return json
 
@@ -172,20 +190,32 @@ class Ride(Document):
         return cls.objects(by_user=user)
 
     def make_json(self):
+
         json = {
             "uid": self.uid,
             "user": self.by_user.make_json(),
             "start": self.start,
-            "end": self.end,
-            "location": {
+            "end": self.end
+        }
+
+        if type(self.location) is dict:
+            json['location'] = {
+                "longitude": self.location['coordinates'][0],
+                "latitude": self.location['coordinates'][1]
+            }
+            json['destination'] = {
+                "longitude": self.destination['coordinates'][0],
+                "latitude": self.destination['coordinates'][1]
+            }
+        else:
+            json['location'] = {
                 "longitude": self.location[0],
                 "latitude": self.location[1]
-            },
-            "destination": {
+            }
+            json['destination'] = {
                 "longitude": self.destination[0],
                 "latitude": self.destination[1]
-            },
-        }
+            }
 
         return json
 
@@ -224,12 +254,18 @@ class RideMatching(Document):
         return cls.objects(driver=driver)
 
     @classmethod
-    def find_with_rider(cls, rider):
-        return cls.objects(rider=rider)
+    def find_with_rider(cls, rider, status=None):
+        if status is not None:
+            return cls.objects(rider=rider)
+        else:
+            return cls.objects(rider=rider, status=status.value)
 
     @classmethod
-    def find_with_ride(cls, ride):
-        return cls.objects(ride=ride)
+    def find_with_ride(cls, ride, status=None):
+        if not status:
+            return cls.objects(ride=ride)
+        else:
+            return cls.objects(ride=ride, status=status.value)
 
     @classmethod
     def find_with_request(cls, request):
