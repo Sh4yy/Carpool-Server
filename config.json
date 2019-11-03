@@ -16,5 +16,7 @@
         "account_sid": "AC6e661153fd4420330328d35c689b5561",
         "auth_token": "bab82f4a6cc2c3d8a928b65188822fad",
         "from_number": "+13345532523"
-    }
+    },
+    "google": {
+    "api_key": "AIzaSyDBPJzTaxY_frWN15Y3psY6acfEME-zwUI"}
 }

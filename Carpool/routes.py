@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, abort, request
 from .models import *
+from .utils import find_location
 
 mod = Blueprint("routes", __name__)
 
@@ -223,3 +224,10 @@ def reject_ride_match(email, ride_id):
     return jsonify(ride_match.make_json())
 
 
+@mod.route('/geo', methods=['GET'])
+def get_location():
+
+    # latlng = 40.714224, -73.961452
+    # address= 1113 Mitchell Building, College Park, MD
+
+    return jsonify(find_location(request.args))
