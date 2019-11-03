@@ -224,10 +224,24 @@ def reject_ride_match(email, ride_id):
     return jsonify(ride_match.make_json())
 
 
-@mod.route('/geo', methods=['GET'])
-def get_location():
+@mod.route('/geo/address', methods=['GET'])
+def get_address():
 
     # latlng = 40.714224, -73.961452
     # address= 1113 Mitchell Building, College Park, MD
 
-    return jsonify(find_location(request.args))
+    address = request.json.get('address')
+    coordinates = find_location({"address": address})['geometry']['location']
+
+    return jsonify(coordinates)
+
+
+@mod.route('/geo/coordinate', methods=['GET'])
+def get_coordinate():
+
+    lat = request.json.get('lat')
+    lang = request.json.get('lang')
+
+    address = find_location({"latlng": f"{lat}, {lang}"})['formatted_address']
+
+    return jsonify({"address": address})
