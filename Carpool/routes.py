@@ -3,7 +3,7 @@ from .models import *
 from .utils import find_location
 import json
 from pprint import pprint
-
+from .utils import find_location, find_business
 
 mod = Blueprint("routes", __name__)
 
@@ -101,8 +101,6 @@ def post_new_ride(email):
 
     data = request.data
     data = json.loads(data.decode())
-
-    print(data)
 
     start = data['start']
     end = data['end']
@@ -293,3 +291,16 @@ def get_coordinate():
     address = find_location({"latlng": f"{lat}, {lang}"})['formatted_address']
 
     return jsonify({"address": address})
+
+
+@mod.route('/geo/business/<business_name>', methods=['GET'])
+def find_business_by_name(business_name):
+
+    location = request.json.get("location")
+
+    business = find_business({"radius": 1500,
+                              "name": business_name,
+                              "location": f"{location['lat']},{location['long']}"})
+
+    return jsonify({"location": business["geometry"]["location"],
+                    "name": business["name"]})
