@@ -242,23 +242,25 @@ def get_user_feed(email):
     user_driving_rides = Ride.find_for_user(user)
     user_riding_rides = []
 
+    print(user_driving_rides)
+
     matches = RideMatching.find_with_rider(user, status=RideMatchingStatus.accepted)
     for match in matches:
         if match.ride not in user_riding_rides:
             user_riding_rides.append(match.ride)
 
-    ride_set = set(user_driving_rides).intersection(set(user_riding_rides))
+    ride_set = set(user_driving_rides).union(set(user_riding_rides))
     result = []
 
     for ride in ride_set:
 
         if ride in user_driving_rides:
-            pickup = find_location({"latlng": f"{ride.location['coordinates'][0]}, {ride.location['coordinates'][1]}"})['formatted_address']
-            dest = find_location({"latlng": f"{ride.destination['coordinates'][0]}, {ride.destination['coordinates'][1]}"})['formatted_address']
+            pickup = find_location({"latlng": f"{ride.location['coordinates'][1]}, {ride.location['coordinates'][0]}"})['formatted_address']
+            dest = find_location({"latlng": f"{ride.destination['coordinates'][1]}, {ride.destination['coordinates'][0]}"})['formatted_address']
         else:
             match = RideMatching.objects.get(ride=ride, rider=user, status=RideMatchingStatus.accepted.value)
-            pickup = find_location({"latlng": f"{match.request.location['coordinates'][0]}, {match.request.location['coordinates'][1]}"})['formatted_address']
-            dest = find_location({"latlng": f"{match.request.destination['coordinates'][0]}, {match.request.destination['coordinates'][1]}"})['formatted_address']
+            pickup = find_location({"latlng": f"{match.request.location['coordinates'][1]}, {match.request.location['coordinates'][0]}"})['formatted_address']
+            dest = find_location({"latlng": f"{match.request.destination['coordinates'][1]}, {match.request.destination['coordinates'][0]}"})['formatted_address']
 
         temp = {'ride': ride.make_json(),
                 'pickup': pickup,
