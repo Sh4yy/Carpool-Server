@@ -46,7 +46,7 @@ class User(Document):
          .create(
              body=text_message,
              to=f"+1{self.phone_number}",
-             from=config['twilio']['from_number']
+             from_=config['twilio']['from_number']
          ))
 
     def send_push(self, push_data):
