@@ -45,10 +45,10 @@ class User(Document):
         (twilio_client
          .messages
          .create(
-            body=text_message,
-            to=f"+1{self.phone_number}",
-            from_=config['twilio']['from_number']
-        ))
+             body=text_message,
+             to=f"+1{self.phone_number}",
+             from_=config['twilio']['from_number']
+         ))
 
     def send_push(self, push_data):
         pass
@@ -92,6 +92,9 @@ class RideRequest(Document):
         req.by_user = by_user
         req.location = [location_lon, location_lat]
         req.destination = [dest_lon, dest_lat]
+        req.at_time = time
+        req.before_flex = before_flex
+        req.after_flex = after_flex
         req.start = time - before_flex
         req.end = time + after_flex
         req.save()
