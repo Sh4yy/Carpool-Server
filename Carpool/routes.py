@@ -159,8 +159,7 @@ def start_matching_ride(email, ride_id):
 
         # todo notify match
         req.by_user.send_text(
-            f"""{req.by_user.first_name}, we have matched your ride with {driver.first_name},
-                please confirm your pool"""
+            f"""{req.by_user.first_name}, we have matched your ride with {driver.first_name}, please confirm your pool"""
         )
 
     matches = RideMatching.find_with_ride(ride)

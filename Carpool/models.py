@@ -41,13 +41,12 @@ class User(Document):
         self.save()
 
     def send_text(self, text_message):
-        return
         (twilio_client
          .messages
          .create(
              body=text_message,
              to=f"+1{self.phone_number}",
-             from_=config['twilio']['from_number']
+             from=config['twilio']['from_number']
          ))
 
     def send_push(self, push_data):
